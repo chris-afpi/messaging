@@ -62,10 +62,17 @@ class SystemService:
                 await asyncio.sleep(1)
 
     async def register_user_session(self, user_id, service_id):
-        """Track that a user is active on a service."""
-        session_key = f"user:{user_id}:sessions"
-        await self.redis_client.sadd(session_key, service_id)
-        await self.redis_client.expire(session_key, 3600)  # 1 hour TTL
+        """Track that a user is active on a service (bidirectional tracking)."""
+        # Track which services this user is on
+        user_session_key = f"user:{user_id}:sessions"
+        await self.redis_client.sadd(user_session_key, service_id)
+        await self.redis_client.expire(user_session_key, 3600)  # 1 hour TTL
+
+        # Track which users are on this service
+        service_users_key = f"service:{service_id}:users"
+        await self.redis_client.sadd(service_users_key, user_id)
+        await self.redis_client.expire(service_users_key, 3600)  # 1 hour TTL
+
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Registered {user_id} on {service_id}")
 
     async def get_user_services(self, user_id):
@@ -73,6 +80,12 @@ class SystemService:
         session_key = f"user:{user_id}:sessions"
         services = await self.redis_client.smembers(session_key)
         return services if services else set()
+
+    async def get_service_users(self, service_id):
+        """Get all users active on a service."""
+        service_key = f"service:{service_id}:users"
+        users = await self.redis_client.smembers(service_key)
+        return users if users else set()
 
     async def handle_message(self, message_id, message_data):
         """Process a single message and send response."""

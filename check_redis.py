@@ -7,9 +7,17 @@ print('Streams in Redis:')
 for key in r.keys('*-to-*'):
     print(f'  {key}: {r.xlen(key)} messages')
 
-print('\nSessions:')
+print('\nUser → Services Mapping:')
 for key in r.keys('user:*:sessions'):
-    print(f'  {key}: {r.smembers(key)}')
+    user_id = key.split(':')[1]
+    services = r.smembers(key)
+    print(f'  {user_id} is on: {services}')
+
+print('\nService → Users Mapping:')
+for key in r.keys('service:*:users'):
+    service_id = key.split(':')[1]
+    users = r.smembers(key)
+    print(f'  {service_id} has users: {users}')
 
 print('\nRecent messages in system-to-ui1:')
 messages = r.xrevrange('system-to-ui1', count=3)
