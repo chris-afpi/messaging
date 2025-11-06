@@ -10,10 +10,11 @@ from datetime import datetime
 
 
 class UIService1:
-    def __init__(self, redis_url="redis://localhost"):
+    def __init__(self, redis_url="redis://localhost", user_id="alice"):
         self.redis_url = redis_url
         self.redis_client = None
         self.service_id = "ui1"
+        self.user_id = user_id  # User identity for multi-device sync
         self.output_stream = "ui-to-system"
         self.input_stream = f"system-to-{self.service_id}"
         self.send_interval = 11  # seconds
@@ -34,6 +35,17 @@ class UIService1:
         )
         print(f"[UI1] Connected to Redis")
 
+    async def register_session(self):
+        """Register this user's session with the system."""
+        registration = {
+            'type': 'register',
+            'user_id': self.user_id,
+            'service_id': self.service_id,
+            'timestamp': datetime.now().isoformat()
+        }
+        await self.redis_client.xadd(self.output_stream, registration)
+        print(f"[UI1] Registered user '{self.user_id}' on service '{self.service_id}'")
+
     async def send_messages(self):
         """Send random name words periodically."""
         print(f"[UI1] Starting to send names every {self.send_interval} seconds...")
@@ -45,7 +57,8 @@ class UIService1:
 
                 # Send to system
                 message = {
-                    'sender': self.service_id,
+                    'user_id': self.user_id,
+                    'service_id': self.service_id,
                     'word': name,
                     'timestamp': datetime.now().isoformat()
                 }
@@ -77,9 +90,17 @@ class UIService1:
 
                 for stream_name, stream_messages in messages:
                     for message_id, message_data in stream_messages:
+                        user_id = message_data.get('user_id')
+                        origin = message_data.get('origin_service')
                         word = message_data.get('word')
                         length = message_data.get('length')
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] [UI1] Response: '{word}' has length {length}")
+
+                        # Display where it came from
+                        if origin == self.service_id:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] [UI1] Response: '{word}' has length {length}")
+                        else:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] [UI1] Response from {origin}: '{word}' has length {length}")
+
                         last_id = message_id
 
             except Exception as e:
@@ -89,6 +110,7 @@ class UIService1:
     async def run(self):
         """Main run loop."""
         await self.connect()
+        await self.register_session()
 
         # Run send and receive tasks concurrently
         await asyncio.gather(
