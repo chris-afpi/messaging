@@ -16,6 +16,7 @@ Usage:
 """
 import asyncio
 import random
+from datetime import datetime
 from ui_service import UIService
 
 
@@ -26,6 +27,21 @@ FRUITS = [
     "mango", "nectarine", "orange", "papaya", "quince",
     "raspberry", "strawberry", "tangerine", "watermelon"
 ]
+
+
+def handle_response(response_data):
+    """Custom response handler for word-length demo."""
+    word = response_data.get('word', 'unknown')
+    length = response_data.get('length', 0)
+    origin = response_data.get('origin_service')
+    is_own = response_data.get('is_from_this_service')
+
+    timestamp = datetime.now().strftime('%H:%M:%S')
+
+    if is_own:
+        print(f"[{timestamp}] [ui2] Response: '{word}' has length {length}")
+    else:
+        print(f"[{timestamp}] [ui2] Response from {origin}: '{word}' has length {length}")
 
 
 async def send_fruits_periodically(service: UIService, interval: int = 13):
@@ -56,7 +72,8 @@ async def main():
     # This means alice is logged into BOTH ui1 and ui2
     service = UIService(
         service_id="ui2",
-        user_id="alice"  # Same user as demo_names.py!
+        user_id="alice",  # Same user as demo_names.py!
+        on_response=handle_response
     )
 
     try:

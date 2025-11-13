@@ -133,15 +133,22 @@ class UIService(StreamService):
             self._default_response_handler(response_data)
 
     def _default_response_handler(self, response_data: Dict[str, Any]):
-        """Default handler for responses when no callback is provided."""
-        word = response_data['word']
-        length = response_data['length']
-        origin = response_data['origin_service']
+        """
+        Default handler for responses when no callback is provided.
 
-        if response_data['is_from_this_service']:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response: '{word}' has length {length}")
+        This is a generic handler that works with any response format.
+        For custom formatting, provide an on_response callback.
+        """
+        origin = response_data.get('origin_service', 'unknown')
+
+        # Remove internal fields for cleaner display
+        display_data = {k: v for k, v in response_data.items()
+                       if k not in ['is_from_this_service', 'origin_service']}
+
+        if response_data.get('is_from_this_service'):
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response: {display_data}")
         else:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response from {origin}: '{word}' has length {length}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response from {origin}: {display_data}")
 
     async def stop_receiving(self):
         """Stop listening for responses."""
