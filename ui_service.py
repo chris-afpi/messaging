@@ -7,14 +7,14 @@ registering sessions, sending messages, and receiving responses. It's designed
 to be used as a library by other applications.
 """
 import asyncio
-import redis.asyncio as redis
 from datetime import datetime
 from typing import Optional, Callable, Dict, Any
+from stream_service import StreamService
 
 
-class UIService:
+class UIService(StreamService):
     """
-    Base UI Service class for communicating with the system service via Redis Streams.
+    UI Service class for communicating with the system service via Redis Streams.
 
     Args:
         service_id: Unique identifier for this service instance (e.g., 'ui1', 'ui2', 'mobile-app')
@@ -30,10 +30,9 @@ class UIService:
         redis_url: str = "redis://localhost",
         on_response: Optional[Callable[[Dict[str, Any]], None]] = None
     ):
+        super().__init__(redis_url)
         self.service_id = service_id
         self.user_id = user_id
-        self.redis_url = redis_url
-        self.redis_client = None
         self.output_stream = "ui-to-system"
         self.input_stream = f"system-to-{self.service_id}"
         self.on_response = on_response
@@ -41,11 +40,8 @@ class UIService:
 
     async def connect(self):
         """Connect to Redis."""
-        self.redis_client = await redis.from_url(
-            self.redis_url,
-            decode_responses=True
-        )
-        print(f"[{self.service_id}] Connected to Redis")
+        await super().connect()
+        print(f"[{self.service_id}] Ready to communicate")
 
     async def register_session(self):
         """Register this user's session with the system."""
@@ -55,7 +51,7 @@ class UIService:
             'service_id': self.service_id,
             'timestamp': datetime.now().isoformat()
         }
-        await self.redis_client.xadd(self.output_stream, registration)
+        await self.send_to_stream(self.output_stream, registration)
         print(f"[{self.service_id}] Registered user '{self.user_id}' on service '{self.service_id}'")
 
     async def send_message(self, word: str):
@@ -65,9 +61,6 @@ class UIService:
         Args:
             word: The word to send for processing
         """
-        if not self.redis_client:
-            raise RuntimeError("Not connected to Redis. Call connect() first.")
-
         message = {
             'user_id': self.user_id,
             'service_id': self.service_id,
@@ -75,7 +68,7 @@ class UIService:
             'timestamp': datetime.now().isoformat()
         }
 
-        await self.redis_client.xadd(self.output_stream, message)
+        await self.send_to_stream(self.output_stream, message)
         print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: '{word}'")
 
     async def start_receiving(self):
@@ -94,40 +87,50 @@ class UIService:
 
         while self._receiving:
             try:
-                messages = await self.redis_client.xread(
-                    {self.input_stream: last_id},
+                messages = await self.read_from_stream(
+                    self.input_stream,
+                    last_id=last_id,
                     count=10,
-                    block=1000  # Block for 1 second
+                    block=1000
                 )
 
                 for stream_name, stream_messages in messages:
                     for message_id, message_data in stream_messages:
-                        user_id = message_data.get('user_id')
-                        origin = message_data.get('origin_service')
-                        word = message_data.get('word')
-                        length = message_data.get('length')
-
-                        response_data = {
-                            'user_id': user_id,
-                            'origin_service': origin,
-                            'word': word,
-                            'length': length,
-                            'is_from_this_service': origin == self.service_id
-                        }
-
-                        # Call the callback if provided
-                        if self.on_response:
-                            self.on_response(response_data)
-                        else:
-                            # Default behavior: print to console
-                            self._default_response_handler(response_data)
-
+                        await self.process_message(message_id, message_data)
                         last_id = message_id
 
             except Exception as e:
                 if self._receiving:  # Only log if we're supposed to be receiving
                     print(f"[{self.service_id}] Error receiving response: {e}")
                 await asyncio.sleep(1)
+
+    async def process_message(self, message_id: str, message_data: Dict[str, Any]):
+        """
+        Process a received message.
+
+        Args:
+            message_id: Redis message ID
+            message_data: Message data dictionary
+        """
+        user_id = message_data.get('user_id')
+        origin = message_data.get('origin_service')
+        word = message_data.get('word')
+        length = message_data.get('length')
+
+        response_data = {
+            'user_id': user_id,
+            'origin_service': origin,
+            'word': word,
+            'length': length,
+            'is_from_this_service': origin == self.service_id
+        }
+
+        # Call the callback if provided
+        if self.on_response:
+            self.on_response(response_data)
+        else:
+            # Default behavior: print to console
+            self._default_response_handler(response_data)
 
     def _default_response_handler(self, response_data: Dict[str, Any]):
         """Default handler for responses when no callback is provided."""
@@ -144,8 +147,16 @@ class UIService:
         """Stop listening for responses."""
         self._receiving = False
 
+    async def run(self):
+        """
+        Main run loop. For backward compatibility.
+        Most applications should use start_receiving() directly instead.
+        """
+        await self.connect()
+        await self.register_session()
+        await self.start_receiving()
+
     async def close(self):
         """Clean up resources."""
         await self.stop_receiving()
-        if self.redis_client:
-            await self.redis_client.close()
+        await super().close()

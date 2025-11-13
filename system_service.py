@@ -5,24 +5,28 @@ Listens for messages and replies with the word length.
 """
 import asyncio
 import redis.asyncio as redis
-import json
 from datetime import datetime
+from typing import Dict, Any
+from stream_service import StreamService
 
 
-class SystemService:
+class SystemService(StreamService):
+    """
+    Central system service that processes messages from UI services.
+
+    Uses consumer groups for scalable message processing and tracks
+    user sessions bidirectionally for multi-device support.
+    """
+
     def __init__(self, redis_url="redis://localhost"):
-        self.redis_url = redis_url
-        self.redis_client = None
+        super().__init__(redis_url)
         self.input_stream = "ui-to-system"
         self.consumer_group = "system-processors"
         self.consumer_name = "system-worker-1"
 
     async def connect(self):
         """Connect to Redis and create consumer group if needed."""
-        self.redis_client = await redis.from_url(
-            self.redis_url,
-            decode_responses=True
-        )
+        await super().connect()
 
         # Create consumer group (ignore error if it already exists)
         try:
@@ -38,30 +42,7 @@ class SystemService:
                 raise
             print(f"Consumer group '{self.consumer_group}' already exists")
 
-    async def process_messages(self):
-        """Listen for messages and process them."""
-        print(f"System service listening on stream '{self.input_stream}'...")
-
-        while True:
-            try:
-                # Read messages from the stream using consumer group
-                messages = await self.redis_client.xreadgroup(
-                    self.consumer_group,
-                    self.consumer_name,
-                    {self.input_stream: '>'},
-                    count=10,
-                    block=1000  # Block for 1 second
-                )
-
-                for stream_name, stream_messages in messages:
-                    for message_id, message_data in stream_messages:
-                        await self.handle_message(message_id, message_data)
-
-            except Exception as e:
-                print(f"Error processing messages: {e}")
-                await asyncio.sleep(1)
-
-    async def register_user_session(self, user_id, service_id):
+    async def register_user_session(self, user_id: str, service_id: str):
         """Track that a user is active on a service (bidirectional tracking)."""
         # Track which services this user is on
         user_session_key = f"user:{user_id}:sessions"
@@ -73,21 +54,21 @@ class SystemService:
         await self.redis_client.sadd(service_users_key, user_id)
         await self.redis_client.expire(service_users_key, 3600)  # 1 hour TTL
 
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Registered {user_id} on {service_id}")
+        self.log(f"Registered {user_id} on {service_id}")
 
-    async def get_user_services(self, user_id):
+    async def get_user_services(self, user_id: str):
         """Get all services a user is active on."""
         session_key = f"user:{user_id}:sessions"
         services = await self.redis_client.smembers(session_key)
         return services if services else set()
 
-    async def get_service_users(self, service_id):
+    async def get_service_users(self, service_id: str):
         """Get all users active on a service."""
         service_key = f"service:{service_id}:users"
         users = await self.redis_client.smembers(service_key)
         return users if users else set()
 
-    async def handle_message(self, message_id, message_data):
+    async def process_message(self, message_id: str, message_data: Dict[str, Any]):
         """Process a single message and send response."""
         try:
             message_type = message_data.get('type', 'message')
@@ -100,33 +81,24 @@ class SystemService:
                 if user_id and service_id:
                     await self.register_user_session(user_id, service_id)
                 else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Skipping registration with missing user_id or service_id")
+                    self.log("Skipping registration with missing user_id or service_id")
 
                 # Acknowledge the message
-                await self.redis_client.xack(
-                    self.input_stream,
-                    self.consumer_group,
-                    message_id
-                )
+                await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
                 return
 
             # Handle regular messages
             user_id = message_data.get('user_id')
             service_id = message_data.get('service_id')
             word = message_data.get('word')
-            timestamp = message_data.get('timestamp')
 
             # Skip messages with missing required fields (likely old messages)
             if not user_id or not service_id or not word:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Skipping message with missing fields: {message_data}")
-                await self.redis_client.xack(
-                    self.input_stream,
-                    self.consumer_group,
-                    message_id
-                )
+                self.log(f"Skipping message with missing fields: {message_data}")
+                await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
                 return
 
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Received from {user_id}@{service_id}: '{word}'")
+            self.log(f"Received from {user_id}@{service_id}: '{word}'")
 
             # Calculate word length
             word_length = len(word)
@@ -149,15 +121,11 @@ class SystemService:
 
             for target_service in user_services:
                 response_stream = f"system-to-{target_service}"
-                await self.redis_client.xadd(response_stream, response)
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sent to {target_service} for user {user_id}: length={word_length}")
+                await self.send_to_stream(response_stream, response)
+                self.log(f"Sent to {target_service} for user {user_id}: length={word_length}")
 
             # Acknowledge the message
-            await self.redis_client.xack(
-                self.input_stream,
-                self.consumer_group,
-                message_id
-            )
+            await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
 
         except Exception as e:
             print(f"Error handling message {message_id}: {e}")
@@ -165,23 +133,34 @@ class SystemService:
             traceback.print_exc()
             # Still acknowledge to prevent reprocessing
             try:
-                await self.redis_client.xack(
-                    self.input_stream,
-                    self.consumer_group,
-                    message_id
-                )
+                await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
             except:
                 pass
 
     async def run(self):
         """Main run loop."""
         await self.connect()
-        await self.process_messages()
 
-    async def close(self):
-        """Clean up resources."""
-        if self.redis_client:
-            await self.redis_client.close()
+        print(f"System service listening on stream '{self.input_stream}'...")
+
+        while True:
+            try:
+                # Read messages from the stream using consumer group
+                messages = await self.read_from_stream_group(
+                    self.consumer_group,
+                    self.consumer_name,
+                    self.input_stream,
+                    count=10,
+                    block=1000
+                )
+
+                for stream_name, stream_messages in messages:
+                    for message_id, message_data in stream_messages:
+                        await self.process_message(message_id, message_data)
+
+            except Exception as e:
+                print(f"Error processing messages: {e}")
+                await asyncio.sleep(1)
 
 
 async def main():
