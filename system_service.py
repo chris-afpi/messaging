@@ -123,13 +123,13 @@ class SystemService(StreamService):
                 await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
                 return
 
-            self.log(f"Received from {user_id}@{service_id}: {message_data}")
+            self.log(f"Received from {user_id}@{service_id} (msg_id: {message_id}): {message_data}")
 
             # Process the data (application-specific logic)
             try:
                 response_data = await self.process_data(message_data)
             except Exception as e:
-                self.log(f"Error processing data: {e}")
+                self.log(f"Error processing data (msg_id: {message_id}): {e}")
                 await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
                 return
 
@@ -150,8 +150,8 @@ class SystemService(StreamService):
 
             for target_service in user_services:
                 response_stream = f"system-to-{target_service}"
-                await self.send_to_stream(response_stream, response)
-                self.log(f"Sent to {target_service} for user {user_id}")
+                response_msg_id = await self.send_to_stream(response_stream, response)
+                self.log(f"Sent to {target_service} for user {user_id} (msg_id: {response_msg_id})")
 
             # Acknowledge the message
             await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)

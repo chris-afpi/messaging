@@ -35,13 +35,14 @@ def handle_response(response_data):
     length = response_data.get('length', 0)
     origin = response_data.get('origin_service')
     is_own = response_data.get('is_from_this_service')
+    msg_id = response_data.get('_message_id', 'unknown')
 
     timestamp = datetime.now().strftime('%H:%M:%S')
 
     if is_own:
-        print(f"[{timestamp}] [ui2] Response: '{word}' has length {length}")
+        print(f"[{timestamp}] [ui2] Response: '{word}' has length {length} (msg_id: {msg_id})")
     else:
-        print(f"[{timestamp}] [ui2] Response from {origin}: '{word}' has length {length}")
+        print(f"[{timestamp}] [ui2] Response from {origin}: '{word}' has length {length} (msg_id: {msg_id})")
 
 
 async def send_fruits_periodically(service: UIService, interval: int = 13):

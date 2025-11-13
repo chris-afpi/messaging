@@ -26,8 +26,9 @@ class WordLengthApp:
         word = response_data['word']
         length = response_data['length']
         origin = response_data['origin_service']
+        msg_id = response_data.get('_message_id', 'unknown')
 
-        print(f"✓ Response #{self.response_count}: '{word}' -> {length} chars (from {origin})")
+        print(f"✓ Response #{self.response_count}: '{word}' -> {length} chars (from {origin}, msg_id: {msg_id})")
 
         # You could do anything here:
         # - Update a GUI

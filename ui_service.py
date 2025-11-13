@@ -60,6 +60,9 @@ class UIService(StreamService):
 
         Args:
             data: Dictionary containing the data to send (application-specific fields)
+
+        Returns:
+            Message ID from Redis
         """
         message = {
             'user_id': self.user_id,
@@ -68,8 +71,9 @@ class UIService(StreamService):
             **data  # Merge in application-specific data
         }
 
-        await self.send_to_stream(self.output_stream, message)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: {data}")
+        message_id = await self.send_to_stream(self.output_stream, message)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: {data} (msg_id: {message_id})")
+        return message_id
 
     async def start_receiving(self):
         """
@@ -96,6 +100,8 @@ class UIService(StreamService):
 
                 for stream_name, stream_messages in messages:
                     for message_id, message_data in stream_messages:
+                        # Add message_id to data for tracking
+                        message_data['_message_id'] = message_id
                         await self.process_message(message_id, message_data)
                         last_id = message_id
 
@@ -135,15 +141,16 @@ class UIService(StreamService):
         For custom formatting, provide an on_response callback.
         """
         origin = response_data.get('origin_service', 'unknown')
+        msg_id = response_data.get('_message_id', 'unknown')
 
         # Remove internal fields for cleaner display
         display_data = {k: v for k, v in response_data.items()
-                       if k not in ['is_from_this_service', 'origin_service']}
+                       if k not in ['is_from_this_service', 'origin_service', '_message_id']}
 
         if response_data.get('is_from_this_service'):
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response: {display_data}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response: {display_data} (msg_id: {msg_id})")
         else:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response from {origin}: {display_data}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response from {origin}: {display_data} (msg_id: {msg_id})")
 
     async def stop_receiving(self):
         """Stop listening for responses."""
