@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
 """
-Multi-Device Demo Script
+Demo: Fruits Service
 
-This demo shows the same user (alice) logged into two different services
-simultaneously, with both services staying in sync. When alice sends a
-message from one service, it appears on the other.
-
-Run this alongside demo_names.py (both as user 'alice') to see
-multi-device synchronization in action!
-
-Usage:
-    Terminal 1: python system_service.py
-    Terminal 2: python demo_names.py
-    Terminal 3: python demo_multi_device.py
+This demo shows how to use the UIService class to send random fruits
+every 13 seconds.
 """
 import asyncio
 import random
 from ui_service import UIService
 
 
-# Demo data - fruits
+# Demo data
 FRUITS = [
     "apple", "banana", "cherry", "date", "elderberry",
     "fig", "grape", "honeydew", "kiwi", "lemon",
@@ -43,23 +34,14 @@ async def send_fruits_periodically(service: UIService, interval: int = 13):
 
 
 async def main():
-    print("=" * 60)
-    print("Multi-Device Sync Demo")
-    print("=" * 60)
-    print("This is UI Service 2 running as user 'alice'")
-    print("Run demo_names.py in another terminal to see sync in action!")
-    print("Both services will show messages from each other.")
-    print("=" * 60)
-    print()
-
-    # Create UI Service 2 but with user_id='alice' instead of default 'bob'
-    # This means alice is logged into BOTH ui1 and ui2
+    # Create service instance
     service = UIService(
         service_id="ui2",
-        user_id="alice"  # Same user as demo_names.py!
+        user_id="bob"
     )
 
     try:
+        # Connect and register
         await service.connect()
         await service.register_session()
 
@@ -69,7 +51,7 @@ async def main():
             service.start_receiving()
         )
     except KeyboardInterrupt:
-        print('\n[UI2] Shutting down...')
+        print("\nShutting down...")
     finally:
         await service.close()
 
