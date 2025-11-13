@@ -102,7 +102,8 @@ System service listening on stream 'ui-to-system'...
 - **Fully Asynchronous**: All services use Python's asyncio for non-blocking I/O
 - **Decoupled Architecture**: UI services are completely independent from the system service
 - **Bidirectional Communication**: Messages flow both ways through Redis Streams
-- **Consumer Groups**: System service uses consumer groups for reliable message processing
+- **Consumer Groups**: Both UI and System services use consumer groups for reliable processing
+- **Horizontal Scaling**: Deploy multiple workers for any service with automatic load balancing (see [HORIZONTAL_SCALING.md](HORIZONTAL_SCALING.md))
 - **Concurrent Operations**: Each UI service sends and receives messages concurrently
 - **Configurable Logging**: Easy switch between print statements and logging.Logger (see [LOGGING_GUIDE.md](LOGGING_GUIDE.md))
 - **Multi-device Sync**: Same user can be connected on multiple services with synchronized views
@@ -114,10 +115,29 @@ Press `Ctrl+C` in each terminal to gracefully shutdown the services.
 
 ## Documentation
 
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[HORIZONTAL_SCALING.md](HORIZONTAL_SCALING.md)** - How to horizontally scale services with load balancing
 - **[LOGGING_GUIDE.md](LOGGING_GUIDE.md)** - How to use the configurable logging system
 - **[DEMO_GUIDE.md](DEMO_GUIDE.md)** - Complete guide to running all demos
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture and file organization
 - **[GENERIC_REFACTORING.md](GENERIC_REFACTORING.md)** - How the library was made generic and reusable
+
+## Horizontal Scaling
+
+UIService now supports horizontal scaling through consumer groups. Deploy multiple workers for load balancing:
+
+```python
+# Single worker (default)
+service = UIService("ui1", "alice")
+
+# Multiple workers for horizontal scaling
+worker1 = UIService("ui1", "alice", consumer_name="worker-1")
+worker2 = UIService("ui1", "alice", consumer_name="worker-2")
+worker3 = UIService("ui1", "alice", consumer_name="worker-3")
+# Messages are automatically load-balanced across workers
+```
+
+Run `test_horizontal_scaling.py` to see load balancing in action. See [HORIZONTAL_SCALING.md](HORIZONTAL_SCALING.md) for full details.
 
 ## Logging
 
@@ -140,6 +160,7 @@ Run `demo_logging.py` to see all logging modes in action. See [LOGGING_GUIDE.md]
 You can easily extend this POC by:
 - Creating custom services that extend `SystemService` with your own business logic
 - Building custom UI clients using the `UIService` class as a library
+- Deploying multiple workers per service for horizontal scaling and load balancing
 - Adding more UI services with different behaviors
 - Implementing multi-device sync for users across multiple services
 - Switching to proper logging for production deployments

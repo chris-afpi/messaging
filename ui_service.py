@@ -16,11 +16,17 @@ class UIService(StreamService):
     """
     UI Service class for communicating with the system service via Redis Streams.
 
+    Supports horizontal scaling - multiple workers can be deployed for the same service_id,
+    and messages will be load-balanced across them using Redis consumer groups.
+
     Args:
         service_id: Unique identifier for this service instance (e.g., 'ui1', 'ui2', 'mobile-app')
         user_id: User identifier for multi-device sync
         redis_url: Redis connection URL
         on_response: Optional callback function called when a response is received
+        consumer_name: Optional worker identifier for horizontal scaling (default: '{service_id}-worker-1')
+        logger: Optional logger instance or name
+        use_logging: If True, use logging.Logger; if False, use print (default: False)
     """
 
     def __init__(
@@ -29,6 +35,7 @@ class UIService(StreamService):
         user_id: str,
         redis_url: str = "redis://localhost",
         on_response: Optional[Callable[[Dict[str, Any]], None]] = None,
+        consumer_name: Optional[str] = None,
         logger = None,
         use_logging: bool = False
     ):
@@ -40,10 +47,31 @@ class UIService(StreamService):
         self.on_response = on_response
         self._receiving = False
 
+        # Consumer group setup for horizontal scaling
+        self.consumer_group = f"{self.service_id}-workers"
+        self.consumer_name = consumer_name or f"{self.service_id}-worker-1"
+
     async def connect(self):
-        """Connect to Redis."""
+        """Connect to Redis and create consumer group if needed."""
         await super().connect()
-        self.log(f"[{self.service_id}] Ready to communicate")
+
+        # Create consumer group for horizontal scaling (ignore error if it already exists)
+        try:
+            await self.redis_client.xgroup_create(
+                self.input_stream,
+                self.consumer_group,
+                id='$',  # Start from new messages, not historical ones
+                mkstream=True
+            )
+            self.log(f"Created consumer group '{self.consumer_group}' on stream '{self.input_stream}'")
+        except Exception as e:
+            if "BUSYGROUP" not in str(e):
+                # Only log non-BUSYGROUP errors
+                self.log_debug(f"Consumer group creation: {e}")
+            else:
+                self.log(f"Consumer group '{self.consumer_group}' already exists")
+
+        self.log(f"[{self.service_id}] Ready to communicate (consumer: {self.consumer_name})")
 
     async def register_session(self):
         """Register this user's session with the system."""
@@ -79,23 +107,24 @@ class UIService(StreamService):
 
     async def start_receiving(self):
         """
-        Start listening for responses from the system.
+        Start listening for responses from the system using consumer groups.
         This runs in a loop until stop_receiving() is called.
+        Supports horizontal scaling - multiple workers can process messages concurrently.
         """
         if self._receiving:
             self.log(f"[{self.service_id}] Already receiving messages")
             return
 
         self._receiving = True
-        self.log(f"[{self.service_id}] Listening for responses on stream '{self.input_stream}'...")
-
-        last_id = '$'
+        self.log(f"[{self.service_id}] Listening for responses on stream '{self.input_stream}' (consumer: {self.consumer_name})...")
 
         while self._receiving:
             try:
-                messages = await self.read_from_stream(
+                # Read messages using consumer group for load balancing
+                messages = await self.read_from_stream_group(
+                    self.consumer_group,
+                    self.consumer_name,
                     self.input_stream,
-                    last_id=last_id,
                     count=10,
                     block=1000
                 )
@@ -105,7 +134,13 @@ class UIService(StreamService):
                         # Add message_id to data for tracking
                         message_data['_message_id'] = message_id
                         await self.process_message(message_id, message_data)
-                        last_id = message_id
+
+                        # Acknowledge message after processing
+                        await self.acknowledge_message(
+                            self.input_stream,
+                            self.consumer_group,
+                            message_id
+                        )
 
             except Exception as e:
                 if self._receiving:  # Only log if we're supposed to be receiving

@@ -6,13 +6,16 @@ This demo shows the same user (alice) logged into two different services
 simultaneously, with both services staying in sync. When alice sends a
 message from one service, it appears on the other.
 
-Run this alongside demo_names.py (both as user 'alice') to see
+IMPORTANT: Run this alongside demo_names.py (both as user 'alice') to see
 multi-device synchronization in action!
 
+DO NOT run this with demo_fruits.py - they both use service_id='ui2' and
+will conflict!
+
 Usage:
-    Terminal 1: python system_service.py
-    Terminal 2: python demo_names.py
-    Terminal 3: python demo_multi_device.py
+    Terminal 1: python word_length_service.py
+    Terminal 2: python demo_names.py        (alice on ui1)
+    Terminal 3: python demo_multi_device.py  (alice on ui2)
 """
 import asyncio
 import random
