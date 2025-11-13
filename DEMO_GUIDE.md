@@ -21,32 +21,32 @@ Or simply:
 redis-cli FLUSHALL
 ```
 
-## Demo 1: Original Behavior (Backward Compatible)
+## Demo 1: Two Independent Users
 
-This demonstrates the original functionality where two different users use separate UI services independently.
+This demonstrates two different users using separate UI services independently.
 
 ### Terminal Setup
 
 **Terminal 1 - System Service:**
 ```bash
-python system_service.py
+python word_length_service.py
 ```
 
-**Terminal 2 - UI Service 1 (User: alice):**
+**Terminal 2 - Demo Names (User: alice, Service: ui1):**
 ```bash
-python ui_service_1.py
+python demo_names.py
 ```
 
-**Terminal 3 - UI Service 2 (User: bob):**
+**Terminal 3 - Demo Fruits (User: bob, Service: ui2):**
 ```bash
-python ui_service_2.py
+python demo_fruits.py
 ```
 
 ### Expected Behavior
 
-- **UI Service 1 (alice)**: Sends random names every 11 seconds, receives only its own responses
-- **UI Service 2 (bob)**: Sends random fruits every 13 seconds, receives only its own responses
-- **System Service**: Processes messages from both services and routes responses back to the sender only
+- **demo_names.py (alice@ui1)**: Sends random names every 11 seconds, receives only its own responses
+- **demo_fruits.py (bob@ui2)**: Sends random fruits every 13 seconds, receives only its own responses
+- **word_length_service.py**: Processes messages from both services and routes responses back to the sender only
 
 ### Example Output
 
@@ -88,47 +88,15 @@ This demonstrates the same user logged into multiple UI services simultaneously,
 
 **Terminal 1 - System Service:**
 ```bash
-python system_service.py
+python word_length_service.py
 ```
 
-**Terminal 2 - UI Service 1 (User: alice):**
+**Terminal 2 - Demo Names (User: alice on ui1):**
 ```bash
-python ui_service_1.py
+python demo_names.py
 ```
 
-**Terminal 3 - UI Service 2 (User: alice - same user!):**
-```bash
-python -c "
-import asyncio
-from ui_service_2 import UIService2
-
-async def main():
-    # Create UI Service 2 but with user_id='alice' instead of default 'bob'
-    service = UIService2(user_id='alice')
-    try:
-        await service.run()
-    except KeyboardInterrupt:
-        print('\n[UI2] Shutting down...')
-    finally:
-        await service.close()
-
-asyncio.run(main())
-"
-```
-
-### Option B: Using the Demo Script
-
-**Terminal 1 - System Service:**
-```bash
-python system_service.py
-```
-
-**Terminal 2 - UI Service 1 (User: alice):**
-```bash
-python ui_service_1.py
-```
-
-**Terminal 3 - UI Service 2 as alice:**
+**Terminal 3 - Demo Multi-Device (User: alice on ui2):**
 ```bash
 python demo_multi_device.py
 ```
@@ -209,36 +177,35 @@ python demo_multi_device.py
 
 ## Advanced Testing
 
-### Test 3 Devices for Same User
+### Test Multiple Devices for Same User
 
 ```bash
 # Terminal 1: System Service
-python system_service.py
+python word_length_service.py
 
 # Terminal 2: Alice on UI1 (sends names)
-python ui_service_1.py
+python demo_names.py
 
 # Terminal 3: Alice on UI2 (sends fruits)
-python -c "import asyncio; from ui_service_2 import UIService2; asyncio.run(UIService2(user_id='alice').run())"
-
-# Terminal 4: Alice on UI1 again (another browser/device)
-python -c "import asyncio; from ui_service_1 import UIService1; asyncio.run(UIService1(user_id='alice', service_id='ui3').run())"
+python demo_multi_device.py
 ```
 
-Note: For the 4th terminal, you'd need to update the code to support custom service_ids, or the messages will collide on the same stream.
+Result: Alice sees messages from both her devices synced!
 
-### Test Multiple Users with Multiple Devices
+### Test Multiple Users
 
 ```bash
-# Alice on ui1 and ui2 (synced)
-python ui_service_1.py  # alice on ui1
-python demo_multi_device.py  # alice on ui2
+# Terminal 1: System Service
+python word_length_service.py
 
-# Bob on ui2 only (independent)
-python -c "import asyncio; from ui_service_2 import UIService2; asyncio.run(UIService2(user_id='bob').run())"
+# Terminal 2: Alice on ui1
+python demo_names.py
+
+# Terminal 3: Bob on ui2
+python demo_fruits.py
 ```
 
-Result: Alice sees messages from both her services, Bob sees only his own.
+Result: Alice and Bob see only their own messages (independent users).
 
 ---
 

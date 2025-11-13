@@ -3,8 +3,8 @@ Yes! The system service **can** already send messages to the UI services on its 
 However, the current code only sends messages as **responses** to incoming requests. To enable the system service to send unsolicited messages, you'd just need to add some logic to write to those streams independently.
 
 **Current Architecture:**
-- UI services listen on `system-to-ui1` and `system-to-ui2` (line 18 in ui_service_1.py)
-- They read messages using `xread` and process the `word` and `length` fields (lines 80-82)
+- UI services listen on their respective streams (`system-to-ui1`, `system-to-ui2`, etc.)
+- They read messages using consumer groups and process all fields
 - They don't care *why* the message was sent - they just display it
 
 **To enable unsolicited messages**, you'd just need to add a new async task in the system service. For example:

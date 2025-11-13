@@ -6,14 +6,14 @@ This is a proof of concept demonstrating multiple UI services decoupled from a P
 
 The system consists of:
 
-1. **System Service** (`system_service.py`) - Main processing service that:
+1. **System Service** (`word_length_service.py`) - Main processing service that:
    - Listens for messages from UI services via Redis Streams
    - Calculates the length of received words
    - Sends responses back to the originating UI service
 
-2. **UI Service 1** (`ui_service_1.py`) - Sends random name words every 11 seconds
+2. **Demo: Names** (`demo_names.py`) - Example UI service that sends random name words every 11 seconds
 
-3. **UI Service 2** (`ui_service_2.py`) - Sends random fruit words every 13 seconds
+3. **Demo: Fruits** (`demo_fruits.py`) - Example UI service that sends random fruit words every 13 seconds
 
 ### Communication Flow
 
@@ -50,51 +50,46 @@ You'll need 3 separate terminal windows/tabs to run all services:
 
 ### Terminal 1: Start the System Service
 ```bash
-python system_service.py
+python word_length_service.py
 ```
 
-### Terminal 2: Start UI Service 1
+### Terminal 2: Start Demo Names (alice@ui1)
 ```bash
-python ui_service_1.py
+python demo_names.py
 ```
 
-### Terminal 3: Start UI Service 2
+### Terminal 3: Start Demo Fruits (bob@ui2)
 ```bash
-python ui_service_2.py
+python demo_fruits.py
 ```
 
 ## Expected Output
 
-### System Service
+### System Service (word_length_service.py)
 ```
-Created consumer group 'system-processors' on stream 'ui-to-system'
-System service listening on stream 'ui-to-system'...
-[17:30:11] Received from ui1: 'Alice'
-[17:30:11] Sent to ui1: length=5
-[17:30:13] Received from ui2: 'banana'
-[17:30:13] Sent to ui2: length=6
-```
-
-### UI Service 1
-```
-[UI1] Connected to Redis
-[UI1] Starting to send names every 11 seconds...
-[UI1] Listening for responses on stream 'system-to-ui1'...
-[17:30:11] [UI1] Sent: 'Alice'
-[17:30:11] [UI1] Response: 'Alice' has length 5
-[17:30:22] [UI1] Sent: 'Bob'
-[17:30:22] [UI1] Response: 'Bob' has length 3
+[23:29:39] [WordLengthService] Created consumer group 'system-processors' on stream 'ui-to-system'
+[23:29:39] [WordLengthService] System service listening on stream 'ui-to-system'...
+[23:29:48] [WordLengthService] Registered alice on ui1
+[23:29:48] [WordLengthService] Received from alice@ui1: {..., 'word': 'George'}
+[23:29:48] [WordLengthService] Sent to ui1 for user alice
 ```
 
-### UI Service 2
+### Demo Names (demo_names.py - alice@ui1)
 ```
-[UI2] Connected to Redis
-[UI2] Starting to send fruits every 13 seconds...
-[UI2] Listening for responses on stream 'system-to-ui2'...
-[17:30:13] [UI2] Sent: 'banana'
-[17:30:13] [UI2] Response: 'banana' has length 6
-[17:30:26] [UI2] Sent: 'cherry'
-[17:30:26] [UI2] Response: 'cherry' has length 6
+[23:29:48] [UIService] Created consumer group 'ui1-workers' on stream 'system-to-ui1'
+[23:29:48] [UIService] [ui1] Ready to communicate (consumer: ui1-worker-1)
+Starting to send names every 11 seconds...
+[23:29:48] [UIService] [ui1] Sent: {'word': 'George'}
+[23:29:48] [ui1] Response: 'George' has length 6
+```
+
+### Demo Fruits (demo_fruits.py - bob@ui2)
+```
+[23:18:07] [UIService] Created consumer group 'ui2-workers' on stream 'system-to-ui2'
+[23:18:07] [UIService] [ui2] Ready to communicate (consumer: ui2-worker-1)
+Starting to send fruits every 13 seconds...
+[23:18:07] [UIService] [ui2] Sent: {'word': 'lemon'}
+[23:18:07] [ui2] Response: 'lemon' has length 5
 ```
 
 ## Key Features

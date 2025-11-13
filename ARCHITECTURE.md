@@ -39,21 +39,7 @@ await service.send_message("any text")
 await service.start_receiving()
 ```
 
-### `ui_service_1.py` - Backward Compatibility Wrapper
-Simple re-export of UIService for backward compatibility.
-```python
-from ui_service import UIService
-UIService1 = UIService  # That's it!
-```
-
-### `ui_service_2.py` - Backward Compatibility Wrapper
-Simple re-export of UIService for backward compatibility.
-```python
-from ui_service import UIService
-UIService2 = UIService  # That's it!
-```
-
-### `system_service.py` - Central Processing Service
+### `system_service.py` - Central Processing Service Base Class
 The backend service that:
 - Listens for messages from UI services
 - Processes them (calculates word length)
@@ -116,16 +102,18 @@ Shows how to:
 ```
 messaging/
 ├── Library (reusable, no demo content)
-│   ├── ui_service.py          ← Core library
-│   ├── ui_service_1.py        ← Alias for backward compat
-│   ├── ui_service_2.py        ← Alias for backward compat
-│   └── system_service.py      ← Backend service
+│   ├── stream_service.py      ← Base class for all services
+│   ├── ui_service.py          ← UI client library
+│   ├── system_service.py      ← System service base class
+│   └── word_length_service.py ← Demo implementation of system service
 │
 ├── Demos (application code)
-│   ├── demo_names.py          ← Names sender
-│   ├── demo_fruits.py         ← Fruits sender
-│   ├── demo_multi_device.py   ← Multi-device sync
-│   └── demo_custom_usage.py   ← Custom integration
+│   ├── demo_names.py          ← Names sender (alice@ui1)
+│   ├── demo_fruits.py         ← Fruits sender (bob@ui2)
+│   ├── demo_multi_device.py   ← Multi-device sync (alice@ui2)
+│   ├── demo_custom_usage.py   ← Custom integration example
+│   ├── demo_logging.py        ← Logging feature demo
+│   └── test_horizontal_scaling.py ← Horizontal scaling demo
 │
 ├── Utilities
 │   └── check_redis.py         ← Redis inspection tool
@@ -185,21 +173,17 @@ Library can be used for ANY application:
 
 ## 🔄 Migration Examples
 
-### Old Way (Monolithic)
-```python
-from ui_service_1 import UIService1
-
-service = UIService1()
-await service.run()  # Hardcoded: sends random names every 11 seconds
-```
+### Old Way (Monolithic Demo)
+Early demos had hardcoded logic mixed with library code.
 
 Problems:
 - Can't change interval
 - Can't change word list
 - Can't send on-demand
 - Can't reuse for other apps
+- Demo logic embedded in library files
 
-### New Way (Flexible)
+### New Way (Flexible Library)
 ```python
 from ui_service import UIService
 

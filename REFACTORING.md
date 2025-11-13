@@ -1,5 +1,7 @@
 # Refactoring Documentation
 
+> **Note**: This document describes historical refactoring efforts. For current architecture, see [ARCHITECTURE.md](ARCHITECTURE.md) and [GENERIC_REFACTORING.md](GENERIC_REFACTORING.md).
+
 ## Overview
 
 The codebase has been refactored to separate **reusable library code** from **demo/application code**. This makes the messaging client reusable for any application.
@@ -31,15 +33,11 @@ The codebase has been refactored to separate **reusable library code** from **de
 - Demonstrates library usage for custom applications
 - Example of how you'd integrate into a web app, GUI, etc.
 
-### Backward Compatible Scripts
+### Backward Compatible Scripts (Removed)
 
-**`ui_service_1.py`** - Now uses UIService internally
-- Maintains same behavior as before
-- Exists for backward compatibility
-
-**`ui_service_2.py`** - Now uses UIService internally
-- Maintains same behavior as before
-- Keeps UIService2 class for demo_multi_device.py compatibility
+~~**`ui_service_1.py`** and **`ui_service_2.py`**~~ - These legacy compatibility wrappers have been removed. Use the demo files directly:
+- `demo_names.py` - Replaces ui_service_1.py functionality
+- `demo_fruits.py` - Replaces ui_service_2.py functionality
 
 ## Usage Examples
 
@@ -103,18 +101,11 @@ class MyWebApp:
 
 ## Running the Demos
 
-### Original Demos (Backward Compatible)
+### Current Demos
 ```bash
-python system_service.py     # Terminal 1
-python ui_service_1.py       # Terminal 2 (alice, names)
-python ui_service_2.py       # Terminal 3 (bob, fruits)
-```
-
-### New Clean Demos
-```bash
-python system_service.py     # Terminal 1
-python demo_names.py         # Terminal 2 (alice, names)
-python demo_fruits.py        # Terminal 3 (bob, fruits)
+python word_length_service.py  # Terminal 1 (system service)
+python demo_names.py           # Terminal 2 (alice@ui1, names)
+python demo_fruits.py          # Terminal 3 (bob@ui2, fruits)
 ```
 
 ### Custom Usage Demo
@@ -170,14 +161,15 @@ async def send_names_periodically(service, interval=11):
 
 ## Migration Guide
 
-### Old Code
+### Old Code (Historical - no longer in repo)
 ```python
+# This pattern no longer exists - ui_service_1.py has been removed
 from ui_service_1 import UIService1
 service = UIService1()
 await service.run()  # Hardcoded behavior
 ```
 
-### New Code
+### Current Code
 ```python
 from ui_service import UIService
 
