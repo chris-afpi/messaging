@@ -158,9 +158,15 @@ class StreamService(ABC):
         """
         pass
 
-    @abstractmethod
     async def run(self):
         """
-        Main service loop. Must be implemented by subclasses.
+        Main service loop. Optional - only needed for services that have a main loop.
+
+        Subclasses can override this if they need a run() method.
+        UIService doesn't need this - it uses connect() + register_session() + start_receiving().
+        SystemService does need this - it has a main processing loop.
         """
-        pass
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement run(). "
+            "Either implement run() or use the service's methods directly."
+        )

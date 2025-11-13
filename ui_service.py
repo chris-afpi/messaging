@@ -147,15 +147,6 @@ class UIService(StreamService):
         """Stop listening for responses."""
         self._receiving = False
 
-    async def run(self):
-        """
-        Main run loop. For backward compatibility.
-        Most applications should use start_receiving() directly instead.
-        """
-        await self.connect()
-        await self.register_session()
-        await self.start_receiving()
-
     async def close(self):
         """Clean up resources."""
         await self.stop_receiving()
