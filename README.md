@@ -115,7 +115,6 @@ Press `Ctrl+C` in each terminal to gracefully shutdown the services.
 - **[LOGGING_GUIDE.md](LOGGING_GUIDE.md)** - How to use the configurable logging system
 - **[DEMO_GUIDE.md](DEMO_GUIDE.md)** - Complete guide to running all demos
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture and file organization
-- **[GENERIC_REFACTORING.md](GENERIC_REFACTORING.md)** - How the library was made generic and reusable
 
 ## Horizontal Scaling
 

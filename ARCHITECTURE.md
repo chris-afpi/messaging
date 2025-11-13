@@ -122,8 +122,9 @@ messaging/
     ├── README.md              ← Project overview
     ├── ARCHITECTURE.md        ← This file
     ├── DEMO_GUIDE.md          ← How to run demos
-    ├── REFACTORING.md         ← Refactoring rationale
-    └── improvements.md        ← Known limitations
+    ├── HORIZONTAL_SCALING.md  ← Scaling guide
+    ├── LOGGING_GUIDE.md       ← Logging configuration
+    └── TROUBLESHOOTING.md     ← Common issues
 ```
 
 ---
