@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Main system service that processes messages from UI services via Redis Streams.
-Listens for messages and replies with the word length.
+Generic base class - business logic is implemented by subclasses.
 """
 import asyncio
 import redis.asyncio as redis
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from stream_service import StreamService
 
 
@@ -14,8 +14,13 @@ class SystemService(StreamService):
     """
     Central system service that processes messages from UI services.
 
-    Uses consumer groups for scalable message processing and tracks
-    user sessions bidirectionally for multi-device support.
+    This is a generic base class that handles:
+    - Session tracking (user ↔ services)
+    - Message routing and broadcasting
+    - Consumer group management
+
+    Subclasses must implement:
+    - process_data(): Application-specific business logic
     """
 
     def __init__(self, redis_url="redis://localhost"):
@@ -68,6 +73,27 @@ class SystemService(StreamService):
         users = await self.redis_client.smembers(service_key)
         return users if users else set()
 
+    async def process_data(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process incoming message data and return response data.
+
+        This method contains application-specific business logic and must be
+        implemented by subclasses.
+
+        Args:
+            message_data: The incoming message data (contains application-specific fields)
+
+        Returns:
+            Dictionary with response data (application-specific fields)
+
+        Raises:
+            NotImplementedError: If not overridden by subclass
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement process_data() method. "
+            "This method should contain your application-specific business logic."
+        )
+
     async def process_message(self, message_id: str, message_data: Dict[str, Any]):
         """Process a single message and send response."""
         try:
@@ -90,18 +116,22 @@ class SystemService(StreamService):
             # Handle regular messages
             user_id = message_data.get('user_id')
             service_id = message_data.get('service_id')
-            word = message_data.get('word')
 
-            # Skip messages with missing required fields (likely old messages)
-            if not user_id or not service_id or not word:
-                self.log(f"Skipping message with missing fields: {message_data}")
+            # Skip messages with missing required fields
+            if not user_id or not service_id:
+                self.log(f"Skipping message with missing user_id or service_id: {message_data}")
                 await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
                 return
 
-            self.log(f"Received from {user_id}@{service_id}: '{word}'")
+            self.log(f"Received from {user_id}@{service_id}: {message_data}")
 
-            # Calculate word length
-            word_length = len(word)
+            # Process the data (application-specific logic)
+            try:
+                response_data = await self.process_data(message_data)
+            except Exception as e:
+                self.log(f"Error processing data: {e}")
+                await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
+                return
 
             # Get all services this user is connected to
             user_services = await self.get_user_services(user_id)
@@ -114,15 +144,14 @@ class SystemService(StreamService):
             response = {
                 'user_id': user_id,
                 'origin_service': service_id,
-                'word': word,
-                'length': word_length,
-                'processed_at': datetime.now().isoformat()
+                'processed_at': datetime.now().isoformat(),
+                **response_data  # Merge in application-specific response data
             }
 
             for target_service in user_services:
                 response_stream = f"system-to-{target_service}"
                 await self.send_to_stream(response_stream, response)
-                self.log(f"Sent to {target_service} for user {user_id}: length={word_length}")
+                self.log(f"Sent to {target_service} for user {user_id}")
 
             # Acknowledge the message
             await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
@@ -163,15 +192,12 @@ class SystemService(StreamService):
                 await asyncio.sleep(1)
 
 
-async def main():
-    service = SystemService()
-    try:
-        await service.run()
-    except KeyboardInterrupt:
-        print("\nShutting down system service...")
-    finally:
-        await service.close()
-
+# SystemService is now a base class - use a subclass like WordLengthService
+# See word_length_service.py for an example implementation
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("SystemService is a base class. Use a subclass like:")
+    print("  python word_length_service.py")
+    print("\nOr create your own subclass that implements process_data()")
+    import sys
+    sys.exit(1)

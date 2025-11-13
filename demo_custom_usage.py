@@ -38,7 +38,7 @@ class WordLengthApp:
 
     async def send_word(self, word: str):
         """Send a word to be processed."""
-        await self.service.send_message(word)
+        await self.service.send_message({'word': word})  # Send as dict
 
     async def run(self):
         """Run the application."""

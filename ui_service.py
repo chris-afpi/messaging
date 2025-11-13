@@ -54,22 +54,22 @@ class UIService(StreamService):
         await self.send_to_stream(self.output_stream, registration)
         print(f"[{self.service_id}] Registered user '{self.user_id}' on service '{self.service_id}'")
 
-    async def send_message(self, word: str):
+    async def send_message(self, data: Dict[str, Any]):
         """
         Send a message to the system service.
 
         Args:
-            word: The word to send for processing
+            data: Dictionary containing the data to send (application-specific fields)
         """
         message = {
             'user_id': self.user_id,
             'service_id': self.service_id,
-            'word': word,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            **data  # Merge in application-specific data
         }
 
         await self.send_to_stream(self.output_stream, message)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: '{word}'")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: {data}")
 
     async def start_receiving(self):
         """
@@ -110,18 +110,13 @@ class UIService(StreamService):
 
         Args:
             message_id: Redis message ID
-            message_data: Message data dictionary
+            message_data: Message data dictionary (application-specific fields)
         """
-        user_id = message_data.get('user_id')
         origin = message_data.get('origin_service')
-        word = message_data.get('word')
-        length = message_data.get('length')
 
+        # Add metadata to the response data
         response_data = {
-            'user_id': user_id,
-            'origin_service': origin,
-            'word': word,
-            'length': length,
+            **message_data,  # Pass through all application data
             'is_from_this_service': origin == self.service_id
         }
 

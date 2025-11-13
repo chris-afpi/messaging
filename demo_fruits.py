@@ -42,7 +42,7 @@ async def send_fruits_periodically(service: UIService, interval: int = 13):
     while True:
         try:
             fruit = random.choice(FRUITS)
-            await service.send_message(fruit)
+            await service.send_message({'word': fruit})  # Send as dict
             await asyncio.sleep(interval)
         except Exception as e:
             print(f"Error sending fruit: {e}")

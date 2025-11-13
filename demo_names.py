@@ -42,7 +42,7 @@ async def send_names_periodically(service: UIService, interval: int = 11):
     while True:
         try:
             name = random.choice(NAMES)
-            await service.send_message(name)
+            await service.send_message({'word': name})  # Send as dict
             await asyncio.sleep(interval)
         except Exception as e:
             print(f"Error sending name: {e}")
