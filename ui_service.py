@@ -28,9 +28,11 @@ class UIService(StreamService):
         service_id: str,
         user_id: str,
         redis_url: str = "redis://localhost",
-        on_response: Optional[Callable[[Dict[str, Any]], None]] = None
+        on_response: Optional[Callable[[Dict[str, Any]], None]] = None,
+        logger = None,
+        use_logging: bool = False
     ):
-        super().__init__(redis_url)
+        super().__init__(redis_url, logger=logger, use_logging=use_logging)
         self.service_id = service_id
         self.user_id = user_id
         self.output_stream = "ui-to-system"
@@ -41,7 +43,7 @@ class UIService(StreamService):
     async def connect(self):
         """Connect to Redis."""
         await super().connect()
-        print(f"[{self.service_id}] Ready to communicate")
+        self.log(f"[{self.service_id}] Ready to communicate")
 
     async def register_session(self):
         """Register this user's session with the system."""
@@ -52,7 +54,7 @@ class UIService(StreamService):
             'timestamp': datetime.now().isoformat()
         }
         await self.send_to_stream(self.output_stream, registration)
-        print(f"[{self.service_id}] Registered user '{self.user_id}' on service '{self.service_id}'")
+        self.log(f"[{self.service_id}] Registered user '{self.user_id}' on service '{self.service_id}'")
 
     async def send_message(self, data: Dict[str, Any]):
         """
@@ -72,7 +74,7 @@ class UIService(StreamService):
         }
 
         message_id = await self.send_to_stream(self.output_stream, message)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Sent: {data} (msg_id: {message_id})")
+        self.log(f"[{self.service_id}] Sent: {data} (msg_id: {message_id})")
         return message_id
 
     async def start_receiving(self):
@@ -81,11 +83,11 @@ class UIService(StreamService):
         This runs in a loop until stop_receiving() is called.
         """
         if self._receiving:
-            print(f"[{self.service_id}] Already receiving messages")
+            self.log(f"[{self.service_id}] Already receiving messages")
             return
 
         self._receiving = True
-        print(f"[{self.service_id}] Listening for responses on stream '{self.input_stream}'...")
+        self.log(f"[{self.service_id}] Listening for responses on stream '{self.input_stream}'...")
 
         last_id = '$'
 
@@ -107,7 +109,7 @@ class UIService(StreamService):
 
             except Exception as e:
                 if self._receiving:  # Only log if we're supposed to be receiving
-                    print(f"[{self.service_id}] Error receiving response: {e}")
+                    self.log_error(f"[{self.service_id}] Error receiving response: {e}")
                 await asyncio.sleep(1)
 
     async def process_message(self, message_id: str, message_data: Dict[str, Any]):
@@ -148,9 +150,9 @@ class UIService(StreamService):
                        if k not in ['is_from_this_service', 'origin_service', '_message_id']}
 
         if response_data.get('is_from_this_service'):
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response: {display_data} (msg_id: {msg_id})")
+            self.log(f"[{self.service_id}] Response: {display_data} (msg_id: {msg_id})")
         else:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{self.service_id}] Response from {origin}: {display_data} (msg_id: {msg_id})")
+            self.log(f"[{self.service_id}] Response from {origin}: {display_data} (msg_id: {msg_id})")
 
     async def stop_receiving(self):
         """Stop listening for responses."""

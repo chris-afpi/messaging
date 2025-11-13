@@ -23,8 +23,8 @@ class SystemService(StreamService):
     - process_data(): Application-specific business logic
     """
 
-    def __init__(self, redis_url="redis://localhost"):
-        super().__init__(redis_url)
+    def __init__(self, redis_url="redis://localhost", logger=None, use_logging=False):
+        super().__init__(redis_url, logger=logger, use_logging=use_logging)
         self.input_stream = "ui-to-system"
         self.consumer_group = "system-processors"
         self.consumer_name = "system-worker-1"
@@ -41,11 +41,11 @@ class SystemService(StreamService):
                 id='0',
                 mkstream=True
             )
-            print(f"Created consumer group '{self.consumer_group}' on stream '{self.input_stream}'")
+            self.log(f"Created consumer group '{self.consumer_group}' on stream '{self.input_stream}'")
         except redis.ResponseError as e:
             if "BUSYGROUP" not in str(e):
                 raise
-            print(f"Consumer group '{self.consumer_group}' already exists")
+            self.log(f"Consumer group '{self.consumer_group}' already exists")
 
     async def register_user_session(self, user_id: str, service_id: str):
         """Track that a user is active on a service (bidirectional tracking)."""
@@ -157,7 +157,7 @@ class SystemService(StreamService):
             await self.acknowledge_message(self.input_stream, self.consumer_group, message_id)
 
         except Exception as e:
-            print(f"Error handling message {message_id}: {e}")
+            self.log_error(f"Error handling message {message_id}: {e}")
             import traceback
             traceback.print_exc()
             # Still acknowledge to prevent reprocessing
@@ -170,7 +170,7 @@ class SystemService(StreamService):
         """Main run loop."""
         await self.connect()
 
-        print(f"System service listening on stream '{self.input_stream}'...")
+        self.log(f"System service listening on stream '{self.input_stream}'...")
 
         while True:
             try:
@@ -188,7 +188,7 @@ class SystemService(StreamService):
                         await self.process_message(message_id, message_data)
 
             except Exception as e:
-                print(f"Error processing messages: {e}")
+                self.log_error(f"Error processing messages: {e}")
                 await asyncio.sleep(1)
 
 

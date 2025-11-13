@@ -7,9 +7,10 @@ Provides shared functionality for connection management, sending, and receiving.
 """
 import asyncio
 import redis.asyncio as redis
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 
 class StreamService(ABC):
@@ -20,21 +21,40 @@ class StreamService(ABC):
     - Redis connection management
     - Sending messages to streams
     - Lifecycle management (connect, close)
+    - Configurable logging (print or logger)
 
     Subclasses must implement:
     - process_message(): How to handle incoming messages
     - run(): Main service loop
     """
 
-    def __init__(self, redis_url: str = "redis://localhost"):
+    def __init__(
+        self,
+        redis_url: str = "redis://localhost",
+        logger: Optional[Union[logging.Logger, str]] = None,
+        use_logging: bool = False
+    ):
         """
         Initialize the stream service.
 
         Args:
             redis_url: Redis connection URL
+            logger: Optional logger instance or logger name. If None, uses service class name
+            use_logging: If True, use logging.Logger; if False, use print (default)
         """
         self.redis_url = redis_url
         self.redis_client: Optional[redis.Redis] = None
+        self.use_logging = use_logging
+
+        # Setup logger
+        if use_logging:
+            if isinstance(logger, logging.Logger):
+                self.logger = logger
+            else:
+                logger_name = logger or self.__class__.__name__
+                self.logger = logging.getLogger(logger_name)
+        else:
+            self.logger = None
 
     async def connect(self):
         """Connect to Redis."""
@@ -42,13 +62,13 @@ class StreamService(ABC):
             self.redis_url,
             decode_responses=True
         )
-        print(f"[{self.__class__.__name__}] Connected to Redis at {self.redis_url}")
+        self.log(f"Connected to Redis at {self.redis_url}")
 
     async def close(self):
         """Close Redis connection and clean up resources."""
         if self.redis_client:
             await self.redis_client.close()
-            print(f"[{self.__class__.__name__}] Disconnected from Redis")
+            self.log("Disconnected from Redis")
 
     async def send_to_stream(self, stream: str, data: Dict[str, Any]) -> str:
         """
@@ -141,11 +161,43 @@ class StreamService(ABC):
 
         await self.redis_client.xack(stream, group, message_id)
 
-    def log(self, message: str):
-        """Log a message with timestamp and service name."""
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        service_name = self.__class__.__name__
-        print(f"[{timestamp}] [{service_name}] {message}")
+    def log(self, message: str, level: str = 'info'):
+        """
+        Log a message with timestamp and service name.
+
+        Args:
+            message: Message to log
+            level: Log level ('debug', 'info', 'warning', 'error', 'critical')
+        """
+        if self.use_logging and self.logger:
+            # Use proper logging
+            log_method = getattr(self.logger, level.lower(), self.logger.info)
+            log_method(message)
+        else:
+            # Use print with timestamp and service name
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            service_name = self.__class__.__name__
+            print(f"[{timestamp}] [{service_name}] {message}")
+
+    def log_debug(self, message: str):
+        """Log a debug message."""
+        self.log(message, level='debug')
+
+    def log_info(self, message: str):
+        """Log an info message."""
+        self.log(message, level='info')
+
+    def log_warning(self, message: str):
+        """Log a warning message."""
+        self.log(message, level='warning')
+
+    def log_error(self, message: str):
+        """Log an error message."""
+        self.log(message, level='error')
+
+    def log_critical(self, message: str):
+        """Log a critical message."""
+        self.log(message, level='critical')
 
     @abstractmethod
     async def process_message(self, message_id: str, message_data: Dict[str, Any]):

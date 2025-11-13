@@ -104,16 +104,43 @@ System service listening on stream 'ui-to-system'...
 - **Bidirectional Communication**: Messages flow both ways through Redis Streams
 - **Consumer Groups**: System service uses consumer groups for reliable message processing
 - **Concurrent Operations**: Each UI service sends and receives messages concurrently
+- **Configurable Logging**: Easy switch between print statements and logging.Logger (see [LOGGING_GUIDE.md](LOGGING_GUIDE.md))
+- **Multi-device Sync**: Same user can be connected on multiple services with synchronized views
+- **Generic Base Classes**: Reusable StreamService, UIService, and SystemService classes for building custom applications
 
 ## Stopping the Services
 
 Press `Ctrl+C` in each terminal to gracefully shutdown the services.
 
+## Documentation
+
+- **[LOGGING_GUIDE.md](LOGGING_GUIDE.md)** - How to use the configurable logging system
+- **[DEMO_GUIDE.md](DEMO_GUIDE.md)** - Complete guide to running all demos
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture and file organization
+- **[GENERIC_REFACTORING.md](GENERIC_REFACTORING.md)** - How the library was made generic and reusable
+
+## Logging
+
+The services support both simple print statements (default) and proper logging infrastructure:
+
+```python
+# Default mode - uses print()
+service = UIService("ui1", "alice")
+
+# Logging mode - uses logging.Logger
+import logging
+logging.basicConfig(level=logging.INFO)
+service = UIService("ui1", "alice", use_logging=True)
+```
+
+Run `demo_logging.py` to see all logging modes in action. See [LOGGING_GUIDE.md](LOGGING_GUIDE.md) for full details.
+
 ## Customization
 
 You can easily extend this POC by:
-- Adding more UI services (copy and modify `ui_service_2.py`)
-- Changing send intervals in the service classes
-- Modifying the word lists (names, fruits, etc.)
-- Adding more complex processing logic in the system service
-- Implementing message persistence and replay features using Redis Stream features
+- Creating custom services that extend `SystemService` with your own business logic
+- Building custom UI clients using the `UIService` class as a library
+- Adding more UI services with different behaviors
+- Implementing multi-device sync for users across multiple services
+- Switching to proper logging for production deployments
+- Adding message persistence and replay features using Redis Stream features

@@ -17,6 +17,9 @@ class WordLengthService(SystemService):
     This is an example of how to extend SystemService with custom business logic.
     """
 
+    def __init__(self, redis_url="redis://localhost", logger=None, use_logging=False):
+        super().__init__(redis_url, logger=logger, use_logging=use_logging)
+
     async def process_data(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Calculate the length of the word in the message.
